@@ -18,25 +18,29 @@ class RAGCore:
         if not index_name or not google_api_key:
             raise ValueError("Vui lòng đặt GOOGLE_API_KEY và PINECONE_INDEX_NAME trong file .env")
 
+        # *** SỬA LỖI: Chuyển sang giao thức REST ổn định hơn ***
         self.embedding_model = GoogleGenerativeAIEmbeddings(
             model="models/embedding-001",
-            google_api_key=google_api_key
+            google_api_key=google_api_key,
+            transport='rest'  # Thêm dòng này
         )
-        print("-> Đã kết nối tới Google Embedding API.")
+        print("-> Đã kết nối tới Google Embedding API (qua REST).")
 
+        # *** SỬA LỖI: Chuyển sang giao thức REST ổn định hơn ***
         self.llm = ChatGoogleGenerativeAI(
             model="gemini-1.5-flash-latest", 
             temperature=0.3,
-            google_api_key=google_api_key
+            google_api_key=google_api_key,
+            transport='rest'  # Thêm dòng này
         )
-        print("-> Đã kết nối tới Gemini API.")
+        print("-> Đã kết nối tới Gemini API (qua REST).")
         
         print(f"-> Đang kết nối tới Pinecone index '{index_name}'...")
         vector_store = PineconeVectorStore.from_existing_index(
             index_name=index_name,
             embedding=self.embedding_model
         )
-        self.retriever = vector_store.as_retriever(search_kwargs={'k': 5}) # Lấy 5 tài liệu liên quan
+        self.retriever = vector_store.as_retriever(search_kwargs={'k': 5})
         print("-> Kết nối tới Pinecone thành công.")
         
         self.rag_chain = self._create_rag_chain()
