@@ -1,56 +1,65 @@
-import logging
+import os
+import nest_asyncio  # <-- THÊM DÒNG NÀY
 from flask import Flask, render_template, request, jsonify
+from dotenv import load_dotenv
+
+nest_asyncio.apply()  # <-- VÀ THÊM DÒNG NÀY
+
+load_dotenv()
+
+# --- Phần còn lại của file giữ nguyên ---
 from modules.rag_core import RAGCore
+from modules.vector_db import create_vector_db
 
-# Cấu hình logging để xem thông tin chi tiết hơn
-logging.basicConfig(level=logging.INFO)
-
-# Khởi tạo ứng dụng Flask
 app = Flask(__name__)
 
-# Khởi tạo hệ thống RAG một lần duy nhất khi ứng dụng khởi động
-# Điều này giúp không phải tải lại model mỗi khi có request
+# Khởi tạo RAG Core ngay khi bắt đầu. An toàn vì chỉ kết nối API.
 try:
+    print("Initializing RAG Core...")
     rag_system = RAGCore()
+    print("RAG Core initialized successfully.")
 except Exception as e:
-    logging.error(f"Không thể khởi tạo RAGCore: {e}")
+    print(f"FATAL: Could not initialize RAGCore. Error: {e}")
     rag_system = None
 
 @app.route('/')
 def index():
-    """
-    Hàm này phục vụ file index.html làm giao diện chính.
-    """
+    """Phục vụ trang chat chính."""
     return render_template('index.html')
 
 @app.route('/ask', methods=['POST'])
 def ask():
-    """
-    API endpoint để nhận câu hỏi từ giao diện và trả lời.
-    """
+    """Xử lý câu hỏi chat từ người dùng."""
     if not rag_system:
-        return jsonify({'error': 'Hệ thống RAG chưa sẵn sàng. Vui lòng kiểm tra log server.'}), 500
+        return jsonify({'answer': 'Lỗi hệ thống: RAG Core chưa được khởi tạo. Vui lòng kiểm tra logs.'}), 500
 
-    # Lấy câu hỏi từ dữ liệu JSON mà frontend gửi lên
     data = request.get_json()
-    question = data.get('question', '')
-
-    logging.info(f"Flask nhận câu hỏi: {question}")
+    question = data.get('question')
 
     if not question:
-        return jsonify({'answer': 'Vui lòng đặt câu hỏi.'})
+        return jsonify({'error': 'No question provided'}), 400
 
     try:
-        # Gọi đến RAGCore để xử lý và lấy câu trả lời
-        real_answer = rag_system.answer(question)
-        logging.info(f"Gemini trả lời: {real_answer}")
-        return jsonify({'answer': real_answer})
+        answer = rag_system.answer(question)
+        return jsonify({'answer': answer})
     except Exception as e:
-        logging.error(f"Lỗi khi xử lý câu hỏi: {e}")
-        return jsonify({'answer': 'Xin lỗi, đã có lỗi xảy ra. Vui lòng thử lại.'}), 500
+        print(f"Error during answer generation: {e}")
+        return jsonify({'answer': 'Xin lỗi, đã có lỗi xảy ra trong quá trình xử lý câu hỏi.'}), 500
 
-if __name__ == '__main__':
-    # Chạy ứng dụng Flask
-    # Thêm use_reloader=False để tránh server khởi động lại 2 lần khi ở debug mode
-    app.run(host='0.0.0.0', port=5001, debug=True, use_reloader=False)
+@app.route('/admin/process-data')
+def process_data_route():
+    """Endpoint bí mật để kích hoạt xử lý tài liệu."""
+    secret_key = os.getenv("APP_SECRET_KEY")
+    provided_key = request.args.get('key')
 
+    if not secret_key or provided_key != secret_key:
+        return jsonify({"status": "error", "message": "Unauthorized"}), 403
+
+    try:
+        print("ADMIN: Starting data processing task...")
+        create_vector_db() 
+        print("ADMIN: Data processing task finished successfully.")
+        return jsonify({"status": "success", "message": "Đã xử lý và đẩy dữ liệu lên Pinecone thành công."})
+    except Exception as e:
+        print(f"ADMIN ERROR: Failed to process data. Error: {e}")
+        return jsonify({"status": "error", "message": f"An error occurred: {e}"}), 500
