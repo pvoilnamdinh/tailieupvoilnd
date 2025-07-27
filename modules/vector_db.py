@@ -16,16 +16,42 @@ import json # Thêm dòng này để import thư viện json
 # Tải các biến môi trường từ file .env
 load_dotenv()
 
-# ... (các hàm get_files_recursively và load_documents_from_google_drive_old_version nếu có)
+def get_files_recursively(service, folder_id):
+    """
+    Hàm đệ quy để lấy danh sách tất cả các file từ một thư mục
+    và tất cả các thư mục con của nó.
+    """
+    all_files = []
+    page_token = None
+    query = f"'{folder_id}' in parents and trashed=false"
+    
+    while True:
+        # Lấy danh sách các mục (file và thư mục con) trong thư mục hiện tại
+        response = service.files().list(q=query,
+                                          spaces='drive',
+                                          fields='nextPageToken, files(id, name, mimeType)',
+                                          pageToken=page_token).execute()
+        
+        for item in response.get('files', []):
+            # Nếu là thư mục, gọi lại hàm này để quét bên trong
+            if item.get('mimeType') == 'application/vnd.google-apps.folder':
+                print(f"  -> Đang quét thư mục con: {item.get('name')}")
+                all_files.extend(get_files_recursively(service, item.get('id')))
+            # Nếu là file, thêm vào danh sách kết quả
+            else:
+                all_files.append(item)
+        
+        page_token = response.get('nextPageToken', None)
+        if page_token is None:
+            break
+            
+    return all_files
 
 def load_documents_from_google_drive():
     """
     Kết nối tới Google Drive, tải và đọc nội dung từ tất cả các file
     trong thư mục được chỉ định và các thư mục con của nó.
     """
-    # Lấy thông tin từ biến môi trường
-    # SERVICE_ACCOUNT_FILE = os.getenv('GOOGLE_APPLICATION_CREDENTIALS') # Xóa hoặc comment dòng này
-    
     # Lấy nội dung JSON của credentials từ biến môi trường
     GOOGLE_CREDENTIALS_JSON_CONTENT = os.getenv('GOOGLE_CREDENTIALS_JSON') 
     FOLDER_ID = os.getenv('GOOGLE_DRIVE_FOLDER_ID')
@@ -49,6 +75,7 @@ def load_documents_from_google_drive():
     try:
         items = get_files_recursively(service, FOLDER_ID)
     except Exception as e:
+        # Đã cập nhật thông báo lỗi để bao gồm tên lỗi cụ thể
         raise ConnectionError(f"Không thể lấy danh sách file từ Google Drive. Hãy kiểm tra lại FOLDER_ID và quyền chia sẻ. Lỗi: {e}")
 
     if not items:
@@ -105,7 +132,6 @@ def load_documents_from_google_drive():
     print(f"Đã tải và xử lý thành công nội dung từ {len(all_docs)} tài liệu trên Google Drive.")
     return all_docs
 
-# ... (hàm create_vector_db)
 def create_vector_db():
     """
     Tạo và đẩy dữ liệu vector lên Pinecone từ các tài liệu trên Google Drive.
