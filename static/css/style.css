@@ -4,6 +4,11 @@ body {
     background-color: #f3f4f6; /* bg-gray-100 */
     margin: 0;
     padding: 1rem;
+    /* **THAY ĐỔI**: Căn giữa chat-container */
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    min-height: 100vh;
 }
 
 /* --- Main Chat Container --- */
@@ -23,11 +28,20 @@ body {
 /* --- Branded Header --- */
 .chat-header-branded {
     display: flex;
+    /* **THAY ĐỔI**: Chuyển sang layout cột */
+    flex-direction: column; 
     align-items: center;
-    justify-content: center; /* *** CĂN GIỮA TOÀN BỘ HEADER *** */
+    justify-content: center;
     padding: 1rem 1.5rem;
     background-color: #ffffff;
     border-bottom: 1px solid #e5e7eb;
+}
+
+/* **THAY ĐỔI**: Khối chứa logo và tên công ty */
+.company-block {
+    display: flex;
+    align-items: center;
+    justify-content: center;
 }
 
 .logo {
@@ -36,20 +50,26 @@ body {
 }
 
 .company-info {
-    text-align: center; /* *** CĂN GIỮA TEXT TRONG KHỐI NÀY *** */
+    text-align: center;
 }
 
 .company-name {
     font-size: 1.25rem; /* text-xl */
     font-weight: 700;
-    color: #dc2626; /* *** SỬA MÀU ĐỎ *** */
+    color: #dc2626; /* Màu đỏ */
     line-height: 1.2;
 }
 
+/* **THAY ĐỔI**: Khối chứa tiêu đề ứng dụng */
+.title-block {
+    width: 100%;
+    text-align: center;
+    margin-top: 0.75rem; /* Tạo khoảng cách với khối trên */
+}
+
 .app-title {
-    font-size: 1rem; /* text-base */
-    color: #3b82f6; /* *** SỬA MÀU XANH *** */
-    margin-top: 0.25rem;
+    font-size: 1.125rem; /* text-lg, cho to hơn một chút */
+    color: #3b82f6; /* Màu xanh */
     font-weight: 500;
 }
 

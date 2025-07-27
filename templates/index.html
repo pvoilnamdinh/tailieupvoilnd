@@ -9,15 +9,21 @@
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Roboto:wght@400;500;700&display=swap" rel="stylesheet">
 </head>
-<body class="bg-gray-100 flex items-center justify-center min-h-screen">
+<body>
 
     <div class="chat-container shadow-xl">
-        <!-- Phần Header với Logo và Tên Công Ty -->
+        <!-- Phần Header đã được cấu trúc lại -->
         <header class="chat-header-branded">
-            <img src="{{ url_for('static', filename='Logo.png') }}" alt="Logo PVOIL Nam Định" class="logo">
-            <div class="company-info">
-                <h2 class="company-name">CÔNG TY CỔ PHẦN XĂNG DẦU</h2>
-                <h2 class="company-name">DẦU KHÍ NAM ĐỊNH</h2>
+            <!-- Khối chứa logo và tên công ty -->
+            <div class="company-block">
+                <img src="{{ url_for('static', filename='Logo.png') }}" alt="Logo PVOIL Nam Định" class="logo">
+                <div class="company-info">
+                    <h2 class="company-name">CÔNG TY CỔ PHẦN XĂNG DẦU</h2>
+                    <h2 class="company-name">DẦU KHÍ NAM ĐỊNH</h2>
+                </div>
+            </div>
+            <!-- Khối chứa tiêu đề ứng dụng -->
+            <div class="title-block">
                 <h1 class="app-title">Trợ Lý AI Tra Cứu Thông Tin</h1>
             </div>
         </header>

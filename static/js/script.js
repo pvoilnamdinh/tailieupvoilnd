@@ -3,7 +3,7 @@ document.addEventListener('DOMContentLoaded', function() {
     const sendBtn = document.getElementById('send-btn');
     const chatMessages = document.getElementById('chat-messages');
 
-    // Hàm để thêm tin nhắn vào khung chat
+    // Hàm để thêm tin nhắn vào khung chat và trả về bubble
     function addMessage(text, sender) {
         const messageDiv = document.createElement('div');
         messageDiv.classList.add('message', `${sender}-message`);
@@ -14,83 +14,109 @@ document.addEventListener('DOMContentLoaded', function() {
         
         messageDiv.appendChild(bubbleDiv);
         chatMessages.appendChild(messageDiv);
-        
-        // Tự động cuộn xuống tin nhắn mới nhất
         chatMessages.scrollTop = chatMessages.scrollHeight;
-    }
-    
-    // Hàm hiển thị chỉ báo "đang tải"
-    function showLoadingIndicator() {
-        const loadingDiv = document.createElement('div');
-        loadingDiv.classList.add('message', 'bot-message', 'loading-indicator');
-        loadingDiv.id = 'loading'; // Gán ID để có thể xóa sau
-
-        const bubbleDiv = document.createElement('div');
-        bubbleDiv.classList.add('message-bubble');
-        bubbleDiv.innerHTML = `
-            <div class="dot"></div>
-            <div class="dot"></div>
-            <div class="dot"></div>
-        `;
-        
-        loadingDiv.appendChild(bubbleDiv);
-        chatMessages.appendChild(loadingDiv);
-        chatMessages.scrollTop = chatMessages.scrollHeight;
+        return bubbleDiv; // Trả về để có thể cập nhật
     }
 
-    // Hàm xóa chỉ báo "đang tải"
-    function hideLoadingIndicator() {
-        const loadingElement = document.getElementById('loading');
-        if (loadingElement) {
-            loadingElement.remove();
-        }
+    // --- **HỆ THỐNG KIỂM TRA TRẠNG THÁI SERVER** ---
+    function initializeChat() {
+        console.log("Bắt đầu kiểm tra trạng thái server...");
+        
+        // Vô hiệu hóa giao diện
+        userInput.disabled = true;
+        sendBtn.disabled = true;
+        userInput.placeholder = "Hệ thống đang khởi động, vui lòng chờ...";
+
+        // Hiển thị tin nhắn chờ
+        const statusBubble = addMessage('Xin chào! Đang kết nối tới Trợ lý AI...', 'bot');
+
+        // Bắt đầu hỏi thăm trạng thái server mỗi 3 giây
+        const statusInterval = setInterval(async () => {
+            try {
+                const response = await fetch('/status');
+                const data = await response.json();
+
+                if (data.status === 'ready') {
+                    // Nếu server sẵn sàng, dừng hỏi thăm và kích hoạt giao diện
+                    console.log("Server đã sẵn sàng!");
+                    clearInterval(statusInterval);
+                    statusBubble.textContent = 'Hệ thống đã sẵn sàng! Tôi có thể giúp gì cho bạn?';
+                    userInput.disabled = false;
+                    sendBtn.disabled = false;
+                    userInput.placeholder = "Nhập câu hỏi của bạn ở đây...";
+                    userInput.focus();
+                } else if (data.status === 'error') {
+                    // Nếu server báo lỗi, dừng lại và thông báo lỗi
+                    console.error("Server báo lỗi trong quá trình khởi tạo.");
+                    clearInterval(statusInterval);
+                    statusBubble.textContent = 'Lỗi: Hệ thống không thể khởi động. Vui lòng liên hệ quản trị viên.';
+                } else {
+                    // Nếu vẫn đang khởi tạo, cứ tiếp tục chờ
+                    console.log("Server đang khởi tạo...");
+                }
+            } catch (error) {
+                console.error("Không thể kết nối tới server:", error);
+                statusBubble.textContent = 'Lỗi: Mất kết nối tới server. Vui lòng tải lại trang.';
+                clearInterval(statusInterval);
+            }
+        }, 3000); // Tần suất hỏi thăm
     }
 
     // Hàm chính để xử lý việc gửi tin nhắn
     async function handleSendMessage() {
         const question = userInput.value.trim();
-        if (question === '') {
-            return; // Không gửi nếu không có nội dung
-        }
+        if (question === '' || userInput.disabled) return;
 
-        // 1. Hiển thị câu hỏi của người dùng
         addMessage(question, 'user');
-        userInput.value = ''; // Xóa nội dung trong ô nhập liệu
+        userInput.value = '';
 
-        // 2. Hiển thị chỉ báo đang tải
-        showLoadingIndicator();
+        const loadingBubble = showLoadingIndicator();
 
-        // 3. Gửi câu hỏi đến server
         try {
             const response = await fetch('/ask', {
                 method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json',
-                },
+                headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({ question: question }),
             });
 
             const data = await response.json();
-            
-            // 4. Xóa chỉ báo tải và hiển thị câu trả lời của bot
-            hideLoadingIndicator();
-            addMessage(data.answer, 'bot');
+            updateOrAddMessage(loadingBubble, data.answer);
 
         } catch (error) {
             console.error('Lỗi khi gửi câu hỏi:', error);
-            hideLoadingIndicator();
-            addMessage('Xin lỗi, đã có lỗi xảy ra. Vui lòng thử lại.', 'bot');
+            updateOrAddMessage(loadingBubble, 'Xin lỗi, đã có lỗi xảy ra. Vui lòng thử lại.');
         }
     }
 
-    // Gán sự kiện cho nút gửi và phím Enter
-    sendBtn.addEventListener('click', handleSendMessage);
-    userInput.addEventListener('keydown', function(event) {
-        if (event.key === 'Enter') {
-            handleSendMessage();
+    // Hàm hiển thị chỉ báo "đang tải"
+    function showLoadingIndicator() {
+        const messageDiv = document.createElement('div');
+        messageDiv.classList.add('message', 'bot-message');
+        const bubbleDiv = document.createElement('div');
+        bubbleDiv.classList.add('message-bubble', 'loading-indicator');
+        bubbleDiv.innerHTML = `<div class="dot"></div><div class="dot"></div><div class="dot"></div>`;
+        messageDiv.appendChild(bubbleDiv);
+        chatMessages.appendChild(messageDiv);
+        chatMessages.scrollTop = chatMessages.scrollHeight;
+        return bubbleDiv;
+    }
+
+    // Hàm cập nhật tin nhắn đang tải
+    function updateOrAddMessage(bubble, text) {
+        if (bubble) {
+            bubble.textContent = text;
+            bubble.classList.remove('loading-indicator');
+        } else {
+            addMessage(text, 'bot');
         }
+    }
+
+    // Gán sự kiện
+    sendBtn.addEventListener('click', handleSendMessage);
+    userInput.addEventListener('keydown', (event) => {
+        if (event.key === 'Enter') handleSendMessage();
     });
 
-    // Tin nhắn chào mừng ban đầu
-    addMessage('Xin chào! Tôi là Trợ lý AI của PVOIL Nam Định. Tôi có thể giúp gì cho bạn hôm nay?', 'bot');
+    // Bắt đầu quá trình kiểm tra trạng thái ngay khi trang được tải
+    initializeChat();
 });
