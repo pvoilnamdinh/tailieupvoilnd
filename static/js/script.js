@@ -3,92 +3,81 @@ document.addEventListener('DOMContentLoaded', function() {
     const sendBtn = document.getElementById('send-btn');
     const chatMessages = document.getElementById('chat-messages');
 
-    // Hàm để thêm tin nhắn vào khung chat và trả về bubble
+    // Hàm để thêm tin nhắn vào khung chat
     function addMessage(text, sender) {
         const messageDiv = document.createElement('div');
         messageDiv.classList.add('message', `${sender}-message`);
-
         const bubbleDiv = document.createElement('div');
         bubbleDiv.classList.add('message-bubble');
         bubbleDiv.textContent = text;
-        
         messageDiv.appendChild(bubbleDiv);
         chatMessages.appendChild(messageDiv);
         chatMessages.scrollTop = chatMessages.scrollHeight;
-        return bubbleDiv; // Trả về để có thể cập nhật
+        return bubbleDiv;
     }
 
-    // --- **HỆ THỐNG KIỂM TRA TRẠNG THÁI SERVER** ---
-    function initializeChat() {
-        console.log("Bắt đầu kiểm tra trạng thái server...");
-        
-        // Vô hiệu hóa giao diện
+    // --- HỆ THỐNG "ĐÁNH THỨC" SERVER ---
+    function warmUpSystem() {
+        console.log("Bắt đầu quá trình 'đánh thức' server...");
         userInput.disabled = true;
         sendBtn.disabled = true;
         userInput.placeholder = "Hệ thống đang khởi động, vui lòng chờ...";
-
-        // Hiển thị tin nhắn chờ
         const statusBubble = addMessage('Xin chào! Đang kết nối tới Trợ lý AI...', 'bot');
 
-        // Bắt đầu hỏi thăm trạng thái server mỗi 3 giây
-        const statusInterval = setInterval(async () => {
+        const warmUpInterval = setInterval(async () => {
             try {
-                const response = await fetch('/status');
-                const data = await response.json();
+                // Gửi một câu hỏi "ping" đặc biệt để kích hoạt và kiểm tra server
+                const response = await fetch('/ask', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ question: "__WARM_UP_PING__" }),
+                });
 
-                if (data.status === 'ready') {
-                    // Nếu server sẵn sàng, dừng hỏi thăm và kích hoạt giao diện
-                    console.log("Server đã sẵn sàng!");
-                    clearInterval(statusInterval);
-                    statusBubble.textContent = 'Hệ thống đã sẵn sàng! Tôi có thể giúp gì cho bạn?';
-                    userInput.disabled = false;
-                    sendBtn.disabled = false;
-                    userInput.placeholder = "Nhập câu hỏi của bạn ở đây...";
-                    userInput.focus();
-                } else if (data.status === 'error') {
-                    // Nếu server báo lỗi, dừng lại và thông báo lỗi
-                    console.error("Server báo lỗi trong quá trình khởi tạo.");
-                    clearInterval(statusInterval);
-                    statusBubble.textContent = 'Lỗi: Hệ thống không thể khởi động. Vui lòng liên hệ quản trị viên.';
+                // Nếu server trả về OK (mã 200), nghĩa là đã khởi tạo xong
+                if (response.ok) {
+                    const data = await response.json();
+                    if (data.status === 'ready') {
+                        console.log("Server đã sẵn sàng!");
+                        clearInterval(warmUpInterval);
+                        statusBubble.textContent = 'Hệ thống đã sẵn sàng! Tôi có thể giúp gì cho bạn?';
+                        userInput.disabled = false;
+                        sendBtn.disabled = false;
+                        userInput.placeholder = "Nhập câu hỏi của bạn ở đây...";
+                        userInput.focus();
+                    }
                 } else {
-                    // Nếu vẫn đang khởi tạo, cứ tiếp tục chờ
-                    console.log("Server đang khởi tạo...");
+                    // Nếu server trả về lỗi (ví dụ 503), nghĩa là nó vẫn đang khởi tạo
+                    console.log("Server đang khởi tạo, đang thử lại...");
+                    statusBubble.textContent = 'Đang khởi tạo bộ não AI, vui lòng chờ...';
                 }
             } catch (error) {
-                console.error("Không thể kết nối tới server:", error);
-                statusBubble.textContent = 'Lỗi: Mất kết nối tới server. Vui lòng tải lại trang.';
-                clearInterval(statusInterval);
+                console.error("Lỗi trong quá trình 'đánh thức':", error);
+                statusBubble.textContent = 'Lỗi kết nối. Đang thử lại...';
             }
-        }, 3000); // Tần suất hỏi thăm
+        }, 4000); // Tăng thời gian chờ giữa các lần ping lên 4 giây
     }
 
-    // Hàm chính để xử lý việc gửi tin nhắn
+    // Hàm chính để gửi tin nhắn
     async function handleSendMessage() {
         const question = userInput.value.trim();
         if (question === '' || userInput.disabled) return;
-
         addMessage(question, 'user');
         userInput.value = '';
-
         const loadingBubble = showLoadingIndicator();
-
         try {
             const response = await fetch('/ask', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({ question: question }),
             });
-
             const data = await response.json();
             updateOrAddMessage(loadingBubble, data.answer);
-
         } catch (error) {
             console.error('Lỗi khi gửi câu hỏi:', error);
             updateOrAddMessage(loadingBubble, 'Xin lỗi, đã có lỗi xảy ra. Vui lòng thử lại.');
         }
     }
 
-    // Hàm hiển thị chỉ báo "đang tải"
     function showLoadingIndicator() {
         const messageDiv = document.createElement('div');
         messageDiv.classList.add('message', 'bot-message');
@@ -101,7 +90,6 @@ document.addEventListener('DOMContentLoaded', function() {
         return bubbleDiv;
     }
 
-    // Hàm cập nhật tin nhắn đang tải
     function updateOrAddMessage(bubble, text) {
         if (bubble) {
             bubble.textContent = text;
@@ -111,12 +99,10 @@ document.addEventListener('DOMContentLoaded', function() {
         }
     }
 
-    // Gán sự kiện
     sendBtn.addEventListener('click', handleSendMessage);
     userInput.addEventListener('keydown', (event) => {
         if (event.key === 'Enter') handleSendMessage();
     });
 
-    // Bắt đầu quá trình kiểm tra trạng thái ngay khi trang được tải
-    initializeChat();
+    warmUpSystem();
 });
